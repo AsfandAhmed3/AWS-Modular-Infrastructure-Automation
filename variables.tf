@@ -71,3 +71,15 @@ variable "my_ip_cidr" {
   description = "Your public IP in CIDR format for SSH access to web server (example: x.x.x.x/32)"
   type        = string
 }
+
+variable "state_lock_table_name" {
+  description = "DynamoDB table name for Terraform state locking"
+  type        = string
+  default     = "terraform-state-locks"
+}
+
+variable "ec2_s3_role_name" {
+  description = "IAM role name for EC2 access to the assignment S3 bucket"
+  type        = string
+  default     = "assignment3-ec2-s3-role"
+}

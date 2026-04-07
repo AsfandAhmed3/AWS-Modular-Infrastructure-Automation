@@ -52,3 +52,18 @@ output "ssh_private_key_file" {
   description = "Local path to generated private key"
   value       = local_sensitive_file.ec2_private_key.filename
 }
+
+output "tf_state_bucket_name" {
+  description = "S3 bucket name used for Terraform state"
+  value       = aws_s3_bucket.state.bucket
+}
+
+output "tf_state_lock_table" {
+  description = "DynamoDB table name used for Terraform state locking"
+  value       = aws_dynamodb_table.state_lock.name
+}
+
+output "ec2_s3_role_name" {
+  description = "IAM role name for EC2 S3 access"
+  value       = aws_iam_role.ec2_s3_access.name
+}
