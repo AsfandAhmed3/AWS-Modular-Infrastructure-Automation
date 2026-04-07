@@ -360,3 +360,116 @@ resource "aws_instance" "private_db" {
     Role = "db"
   })
 }
+
+resource "aws_launch_template" "web_asg" {
+  name_prefix   = "${var.project_name}-${var.environment}-web-lt-"
+  image_id      = local.selected_ami_id
+  instance_type = "t3.micro"
+  key_name      = aws_key_pair.ec2_key.key_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_s3_profile.name
+  }
+
+  vpc_security_group_ids = [aws_security_group.web.id]
+  update_default_version = true
+
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    set -euxo pipefail
+    apt-get update -y
+    apt-get install -y stress-ng
+  EOF
+  )
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = merge(local.common_tags, {
+      Name = "${var.project_name}-${var.environment}-asg-instance"
+      Role = "web-asg"
+    })
+  }
+}
+
+resource "aws_autoscaling_group" "web" {
+  name                = "${var.project_name}-${var.environment}-web-asg"
+  min_size            = var.asg_min_size
+  max_size            = var.asg_max_size
+  desired_capacity    = var.asg_desired_capacity
+  vpc_zone_identifier = aws_subnet.public[*].id
+  health_check_type   = "EC2"
+
+  launch_template {
+    id      = aws_launch_template.web_asg.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-${var.environment}-web-asg-instance"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Project"
+    value               = var.project_name
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Environment"
+    value               = var.environment
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_policy" "scale_out" {
+  name                   = "${var.project_name}-${var.environment}-scale-out"
+  autoscaling_group_name = aws_autoscaling_group.web.name
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = 1
+  cooldown               = 120
+}
+
+resource "aws_autoscaling_policy" "scale_in" {
+  name                   = "${var.project_name}-${var.environment}-scale-in"
+  autoscaling_group_name = aws_autoscaling_group.web.name
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = -1
+  cooldown               = 120
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_high" {
+  alarm_name          = "${var.project_name}-${var.environment}-cpu-high"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.scale_out_cpu_threshold
+  alarm_description   = "Scale out when ASG average CPU is high"
+  alarm_actions       = [aws_autoscaling_policy.scale_out.arn]
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.web.name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_low" {
+  alarm_name          = "${var.project_name}-${var.environment}-cpu-low"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Average"
+  threshold           = var.scale_in_cpu_threshold
+  alarm_description   = "Scale in when ASG average CPU is low"
+  alarm_actions       = [aws_autoscaling_policy.scale_in.arn]
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.web.name
+  }
+}

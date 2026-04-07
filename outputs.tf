@@ -67,3 +67,23 @@ output "ec2_s3_role_name" {
   description = "IAM role name for EC2 S3 access"
   value       = aws_iam_role.ec2_s3_access.name
 }
+
+output "asg_name" {
+  description = "Name of the web Auto Scaling Group"
+  value       = aws_autoscaling_group.web.name
+}
+
+output "launch_template_id" {
+  description = "Launch template ID used by ASG"
+  value       = aws_launch_template.web_asg.id
+}
+
+output "cpu_high_alarm_name" {
+  description = "CloudWatch alarm for scale-out"
+  value       = aws_cloudwatch_metric_alarm.cpu_high.alarm_name
+}
+
+output "cpu_low_alarm_name" {
+  description = "CloudWatch alarm for scale-in"
+  value       = aws_cloudwatch_metric_alarm.cpu_low.alarm_name
+}

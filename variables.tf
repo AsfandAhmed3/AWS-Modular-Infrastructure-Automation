@@ -83,3 +83,33 @@ variable "ec2_s3_role_name" {
   type        = string
   default     = "assignment3-ec2-s3-role"
 }
+
+variable "asg_min_size" {
+  description = "Minimum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "asg_max_size" {
+  description = "Maximum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 3
+}
+
+variable "asg_desired_capacity" {
+  description = "Desired number of instances in Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "scale_out_cpu_threshold" {
+  description = "CPU percentage threshold to scale out"
+  type        = number
+  default     = 60
+}
+
+variable "scale_in_cpu_threshold" {
+  description = "CPU percentage threshold to scale in"
+  type        = number
+  default     = 20
+}
