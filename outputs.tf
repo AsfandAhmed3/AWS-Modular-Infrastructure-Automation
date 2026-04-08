@@ -87,3 +87,18 @@ output "cpu_low_alarm_name" {
   description = "CloudWatch alarm for scale-in"
   value       = aws_cloudwatch_metric_alarm.cpu_low.alarm_name
 }
+
+output "alb_dns_name" {
+  description = "DNS name of the Application Load Balancer"
+  value       = aws_lb.web.dns_name
+}
+
+output "alb_security_group_id" {
+  description = "Security group ID of the Application Load Balancer"
+  value       = aws_security_group.alb.id
+}
+
+output "target_group_arn" {
+  description = "Target group ARN attached to ASG"
+  value       = aws_lb_target_group.web.arn
+}

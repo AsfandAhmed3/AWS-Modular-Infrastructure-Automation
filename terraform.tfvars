@@ -12,6 +12,6 @@ state_lock_table_name   = "aws-modular-infra-dev-tf-locks"
 ec2_s3_role_name        = "aws-modular-infra-dev-ec2-s3-role"
 asg_min_size            = 1
 asg_max_size            = 3
-asg_desired_capacity    = 1
+asg_desired_capacity    = 2
 scale_out_cpu_threshold = 60
 scale_in_cpu_threshold  = 20

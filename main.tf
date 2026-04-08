@@ -247,9 +247,9 @@ resource "aws_key_pair" "ec2_key" {
   public_key = tls_private_key.ec2_key.public_key_openssh
 }
 
-resource "aws_security_group" "web" {
-  name        = "${var.project_name}-${var.environment}-web-sg"
-  description = "Security group for public web server"
+resource "aws_security_group" "alb" {
+  name        = "${var.project_name}-${var.environment}-alb-sg"
+  description = "Security group for public ALB"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -260,12 +260,29 @@ resource "aws_security_group" "web" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "HTTPS from internet"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-alb-sg"
+  })
+}
+
+resource "aws_security_group" "web" {
+  name        = "${var.project_name}-${var.environment}-web-sg"
+  description = "Security group for public web server"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from ALB security group"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
@@ -378,7 +395,19 @@ resource "aws_launch_template" "web_asg" {
     #!/bin/bash
     set -euxo pipefail
     apt-get update -y
-    apt-get install -y stress-ng
+    apt-get install -y nginx stress-ng
+    INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+    cat > /var/www/html/index.html <<HTML
+    <html>
+      <head><title>ASG Web Server</title></head>
+      <body>
+        <h1>Load Balanced Nginx Instance</h1>
+        <p>Instance ID: $${INSTANCE_ID}</p>
+      </body>
+    </html>
+    HTML
+    systemctl enable nginx
+    systemctl restart nginx
   EOF
   )
 
@@ -393,12 +422,13 @@ resource "aws_launch_template" "web_asg" {
 }
 
 resource "aws_autoscaling_group" "web" {
-  name                = "${var.project_name}-${var.environment}-web-asg"
-  min_size            = var.asg_min_size
-  max_size            = var.asg_max_size
-  desired_capacity    = var.asg_desired_capacity
-  vpc_zone_identifier = aws_subnet.public[*].id
-  health_check_type   = "EC2"
+  name                      = "${var.project_name}-${var.environment}-web-asg"
+  min_size                  = var.asg_min_size
+  max_size                  = var.asg_max_size
+  desired_capacity          = var.asg_desired_capacity
+  vpc_zone_identifier       = aws_subnet.public[*].id
+  health_check_type         = "ELB"
+  health_check_grace_period = 180
 
   launch_template {
     id      = aws_launch_template.web_asg.id
@@ -422,6 +452,52 @@ resource "aws_autoscaling_group" "web" {
     value               = var.environment
     propagate_at_launch = true
   }
+}
+
+resource "aws_lb" "web" {
+  name               = "${var.project_name}-${var.environment}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = aws_subnet.public[*].id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-alb"
+  })
+}
+
+resource "aws_lb_target_group" "web" {
+  name     = "${var.project_name}-${var.environment}-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path                = "/"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.environment}-tg"
+  })
+}
+
+resource "aws_lb_listener" "web_http" {
+  load_balancer_arn = aws_lb.web.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
+
+resource "aws_autoscaling_attachment" "web_tg" {
+  autoscaling_group_name = aws_autoscaling_group.web.id
+  lb_target_group_arn    = aws_lb_target_group.web.arn
 }
 
 resource "aws_autoscaling_policy" "scale_out" {
