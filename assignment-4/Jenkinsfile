@@ -83,13 +83,13 @@ pipeline {
     }
     success {
       script {
-        sh """curl -s -X POST -H 'Content-type: application/json' --data '{\"text\":\"SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${env.BUILD_URL}\"}' $SLACK_WEBHOOK"""
+        sh 'curl -s -X POST -H "Content-type: application/json" --data "{\"text\":\"SUCCESS: ' + env.JOB_NAME + ' #' + env.BUILD_NUMBER + ' - ' + env.BUILD_URL + '\"}" "$SLACK_WEBHOOK"'
       }
     }
     failure {
       script {
         def stageName = env.FAILING_STAGE ?: 'unknown'
-        sh """curl -s -X POST -H 'Content-type: application/json' --data '{\"text\":\"FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER} at ${stageName} - ${env.BUILD_URL}\"}' $SLACK_WEBHOOK"""
+        sh 'curl -s -X POST -H "Content-type: application/json" --data "{\"text\":\"FAILURE: ' + env.JOB_NAME + ' #' + env.BUILD_NUMBER + ' at ' + stageName + ' - ' + env.BUILD_URL + '\"}" "$SLACK_WEBHOOK"'
       }
     }
   }
