@@ -17,7 +17,7 @@ pipeline {
       steps {
         script { env.FAILING_STAGE = 'Build' }
         dir('app') {
-          sh 'npm ci'
+          sh 'npm install'
         }
       }
     }
