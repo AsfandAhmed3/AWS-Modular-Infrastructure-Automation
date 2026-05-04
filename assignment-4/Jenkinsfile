@@ -36,6 +36,27 @@ pipeline {
             }
             junit 'app/reports/unit/junit.xml'
           }
+
+        stage('Static Analysis') {
+          steps {
+            script { env.FAILING_STAGE = 'Static Analysis' }
+            dir('app') {
+              sh 'npm run test:unit -- --coverage --coverageReporters=lcov'
+              withSonarQubeEnv('sonarqube') {
+                sh 'sonar-scanner -Dsonar.projectKey=assignment4-app -Dsonar.projectName=assignment4-app -Dsonar.sources=src -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info -Dsonar.login=$SONAR_AUTH_TOKEN'
+              }
+            }
+          }
+        }
+
+        stage('Quality Gate') {
+          steps {
+            script { env.FAILING_STAGE = 'Quality Gate' }
+            timeout(time: 10, unit: 'MINUTES') {
+              waitForQualityGate abortPipeline: true
+            }
+          }
+        }
         }
 
         stage('Integration Tests') {
