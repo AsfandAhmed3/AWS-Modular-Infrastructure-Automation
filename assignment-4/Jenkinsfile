@@ -1,0 +1,96 @@
+pipeline {
+  agent { label 'linux-agent' }
+
+  environment {
+    SLACK_WEBHOOK = credentials('slack-webhook')
+  }
+
+  options {
+    timestamps()
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script { env.FAILING_STAGE = 'Checkout' }
+        checkout scm
+      }
+    }
+
+    stage('Build') {
+      steps {
+        script { env.FAILING_STAGE = 'Build' }
+        dir('app') {
+          sh 'npm ci'
+        }
+      }
+    }
+
+    stage('Test') {
+      parallel {
+        stage('Unit Tests') {
+          steps {
+            script { env.FAILING_STAGE = 'Test:unit' }
+            dir('app') {
+              sh 'mkdir -p reports/unit'
+              withEnv([
+                'JEST_JUNIT_OUTPUT_DIR=reports/unit',
+                'JEST_JUNIT_OUTPUT_NAME=junit.xml'
+              ]) {
+                sh 'npm run test:unit'
+              }
+            }
+            junit 'app/reports/unit/junit.xml'
+          }
+        }
+
+        stage('Integration Tests') {
+          steps {
+            script { env.FAILING_STAGE = 'Test:integration' }
+            dir('app') {
+              sh 'mkdir -p reports/integration'
+              withEnv([
+                'JEST_JUNIT_OUTPUT_DIR=reports/integration',
+                'JEST_JUNIT_OUTPUT_NAME=junit.xml'
+              ]) {
+                sh 'npm run test:integration'
+              }
+            }
+            junit 'app/reports/integration/junit.xml'
+          }
+        }
+      }
+    }
+
+    stage('Package') {
+      steps {
+        script { env.FAILING_STAGE = 'Package' }
+        sh 'tar -czf app.tar.gz app'
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        script { env.FAILING_STAGE = 'Deploy' }
+        sh 'echo Deploy placeholder: replace with real deploy in later tasks.'
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: 'app.tar.gz', allowEmptyArchive: true
+    }
+    success {
+      script {
+        sh """curl -s -X POST -H 'Content-type: application/json' --data '{\"text\":\"SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${env.BUILD_URL}\"}' $SLACK_WEBHOOK"""
+      }
+    }
+    failure {
+      script {
+        def stageName = env.FAILING_STAGE ?: 'unknown'
+        sh """curl -s -X POST -H 'Content-type: application/json' --data '{\"text\":\"FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER} at ${stageName} - ${env.BUILD_URL}\"}' $SLACK_WEBHOOK"""
+      }
+    }
+  }
+}

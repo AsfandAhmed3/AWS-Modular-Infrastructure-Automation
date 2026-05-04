@@ -1,0 +1,11 @@
+.terraform/
+.terraform.d/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan*
+crash.log
+*.pem
+.env
+tf-init-debug.log
+aws-provider.zip
