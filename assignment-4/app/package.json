@@ -1,0 +1,20 @@
+{
+  "name": "assignment4-sample-app",
+  "version": "1.0.0",
+  "description": "Sample Node.js app for Jenkins pipeline",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test:unit": "jest --runTestsByPath tests/unit --ci --reporters=default --reporters=jest-junit",
+    "test:integration": "jest --runTestsByPath tests/integration --ci --reporters=default --reporters=jest-junit",
+    "test": "jest --ci --reporters=default --reporters=jest-junit"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "supertest": "^6.3.4"
+  }
+}
