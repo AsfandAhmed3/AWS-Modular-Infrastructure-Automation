@@ -9,3 +9,4 @@ crash.log
 .env
 tf-init-debug.log
 aws-provider.zip
+node_modules/
