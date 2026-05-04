@@ -5,10 +5,6 @@ pipeline {
     SLACK_WEBHOOK = credentials('slack-webhook')
   }
 
-  options {
-    timestamps()
-  }
-
   stages {
     stage('Checkout') {
       steps {
@@ -101,4 +97,4 @@ pipeline {
       }
     }
   }
-}git add Jenkinsfile
+}
