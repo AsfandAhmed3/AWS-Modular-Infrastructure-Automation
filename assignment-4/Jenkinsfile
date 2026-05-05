@@ -59,6 +59,49 @@ pipeline {
         }
         }
 
+        stage('Docker Build & Push') {
+    steps {
+        script {
+            // Login to ECR
+            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO_URI}"
+            
+            // Build the image
+            def appImage = docker.build("${ECR_REPO_URI}:${env.BUILD_NUMBER}")
+            
+            // Push the image
+            appImage.push()
+            appImage.push("latest")
+        }
+    }
+}
+stage('Terraform Plan') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+            dir('terraform') {
+                sh 'terraform init'
+                sh 'terraform plan -out=tfplan'
+            }
+        }
+    }
+}
+
+stage('Terraform Apply') {
+    // Optional: Add an 'input' step here for manual approval
+    steps {
+        withCredentials([
+            string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+            dir('terraform') {
+                sh 'terraform apply -auto-approve tfplan'
+            }
+        }
+    }
+}
+
         stage('Integration Tests') {
           steps {
             script { env.FAILING_STAGE = 'Test:integration' }
