@@ -19,7 +19,14 @@ resource "local_sensitive_file" "jenkins_private_key" {
   filename        = "${path.module}/${var.key_name}.pem"
   file_permission = "0400"
 }
-
+terraform {
+  backend "s3" {
+    bucket         = "your-unique-terraform-state-bucket"
+    key            = "assignment-4/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-lock-table"
+  }
+}
 resource "aws_key_pair" "jenkins_key" {
   key_name   = var.key_name
   public_key = tls_private_key.jenkins_key.public_key_openssh

@@ -1,12 +1,10 @@
+@Library('jenkins-shared-library') _
+
 pipeline {
   agent { label 'linux-agent' }
 
   environment {
     SLACK_WEBHOOK = credentials('slack-webhook')
-  }
-
-  options {
-    timestamps()
   }
 
   stages {
@@ -16,15 +14,11 @@ pipeline {
         checkout scm
       }
     }
-
-    stage('Build') {
-      steps {
+          notifySlack(message: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${env.BUILD_URL}", webhook: env.SLACK_WEBHOOK)
         script { env.FAILING_STAGE = 'Build' }
         dir('app') {
-          sh 'npm ci'
-        }
-      }
-    }
+          def stageName = env.FAILING_STAGE ?: 'unknown'
+          notifySlack(message: "FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER} at ${stageName} - ${env.BUILD_URL}", webhook: env.SLACK_WEBHOOK)
 
     stage('Test') {
       parallel {
@@ -42,7 +36,71 @@ pipeline {
             }
             junit 'app/reports/unit/junit.xml'
           }
+
+        stage('Static Analysis') {
+          steps {
+            script { env.FAILING_STAGE = 'Static Analysis' }
+            dir('app') {
+              sh 'npm run test:unit -- --coverage --coverageReporters=lcov'
+              withSonarQubeEnv('sonarqube') {
+                sh 'sonar-scanner -Dsonar.projectKey=assignment4-app -Dsonar.projectName=assignment4-app -Dsonar.sources=src -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info -Dsonar.login=$SONAR_AUTH_TOKEN'
+              }
+            }
+          }
         }
+
+        stage('Quality Gate') {
+          steps {
+            script { env.FAILING_STAGE = 'Quality Gate' }
+            timeout(time: 10, unit: 'MINUTES') {
+              waitForQualityGate abortPipeline: true
+            }
+          }
+        }
+        }
+
+        stage('Docker Build & Push') {
+    steps {
+        script {
+            // Login to ECR
+            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO_URI}"
+            
+            // Build the image
+            def appImage = docker.build("${ECR_REPO_URI}:${env.BUILD_NUMBER}")
+            
+            // Push the image
+            appImage.push()
+            appImage.push("latest")
+        }
+    }
+}
+stage('Terraform Plan') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+            dir('terraform') {
+                sh 'terraform init'
+                sh 'terraform plan -out=tfplan'
+            }
+        }
+    }
+}
+
+stage('Terraform Apply') {
+    // Optional: Add an 'input' step here for manual approval
+    steps {
+        withCredentials([
+            string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+            dir('terraform') {
+                sh 'terraform apply -auto-approve tfplan'
+            }
+        }
+    }
+}
 
         stage('Integration Tests') {
           steps {
@@ -83,13 +141,21 @@ pipeline {
     }
     success {
       script {
-        sh 'curl -s -X POST -H "Content-type: application/json" --data "{\"text\":\"SUCCESS: ' + env.JOB_NAME + ' #' + env.BUILD_NUMBER + ' - ' + env.BUILD_URL + '\"}" "$SLACK_WEBHOOK"'
+        sh """
+        curl -s -X POST -H 'Content-type: application/json' \
+        --data '{"text":"SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${env.BUILD_URL}"}' \
+        \$SLACK_WEBHOOK
+        """
       }
     }
     failure {
       script {
         def stageName = env.FAILING_STAGE ?: 'unknown'
-        sh 'curl -s -X POST -H "Content-type: application/json" --data "{\"text\":\"FAILURE: ' + env.JOB_NAME + ' #' + env.BUILD_NUMBER + ' at ' + stageName + ' - ' + env.BUILD_URL + '\"}" "$SLACK_WEBHOOK"'
+        sh """
+        curl -s -X POST -H 'Content-type: application/json' \
+        --data '{"text":"FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER} at ${stageName} - ${env.BUILD_URL}"}' \
+        \$SLACK_WEBHOOK
+        """
       }
     }
   }
