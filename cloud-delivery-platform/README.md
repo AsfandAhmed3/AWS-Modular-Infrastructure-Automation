@@ -1,10 +1,10 @@
-# Assignment 4 - Jenkins CI/CD on Top of Assignment 3
+# Cloud Delivery Platform
 
-This folder contains the Assignment 4 implementation. It reuses the AWS infrastructure from Assignment 3 and adds a full Jenkins-based CI/CD workflow for build, test, quality gate, packaging, security scanning, Terraform automation, and deployment delivery.
+Cloud Delivery Platform is the application delivery layer for this repository. It turns the AWS infrastructure foundation into a complete CI/CD environment with Jenkins, automated testing, code quality checks, container delivery, infrastructure automation, and blue-green deployment workflows.
 
 ## Project Goal
 
-The goal of Assignment 4 is to show a working delivery pipeline built on top of the AWS foundation from Assignment 3. Jenkins is used to orchestrate application testing, Docker image builds, SonarQube analysis, ECR publishing, Terraform automation, and blue-green deployment patterns.
+The goal of the Cloud Delivery Platform is to show a working delivery pipeline built on top of the AWS foundation in this repository. Jenkins is used to orchestrate application testing, Docker image builds, SonarQube analysis, ECR publishing, Terraform automation, and blue-green deployment patterns.
 
 ## Application Included In This Folder
 
@@ -28,7 +28,7 @@ The app is set up with Jest and Supertest.
 ### Local App Commands
 
 ```powershell
-cd assignment-4\app
+cd cloud-delivery-platform\app
 npm install
 npm start
 npm test
@@ -50,13 +50,13 @@ npm run test:integration
 - `jenkins/setup.md` - controller and agent bootstrap steps
 - `jenkins/terraform/` - Terraform for the Jenkins controller and private agent
 
-## Infrastructure Reuse From Assignment 3
+## Infrastructure Reuse From The Main Terraform Stack
 
-Assignment 4 must use the AWS environment provisioned earlier and should not recreate it manually.
+This project uses the AWS environment provisioned by the main Terraform configuration and should not recreate it manually.
 
-- VPC, subnets, route tables, and NAT Gateway come from Assignment 3
+- VPC, subnets, route tables, and NAT Gateway come from the main Terraform stack
 - Security groups from the shared infrastructure are reused by Jenkins, SonarQube, and application resources
-- Terraform state and locking should continue to use the S3 backend and DynamoDB table created in Assignment 3
+- Terraform state and locking should continue to use the S3 backend and DynamoDB table created in the root project
 
 ## Jenkins Workflow Overview
 
@@ -104,7 +104,7 @@ The Jenkins bootstrap files and setup guide expect the following plugins to be i
 
 ## What The Report Should Show
 
-The final submission for Assignment 4 should include screenshots and explanations for:
+The final submission for this project should include screenshots and explanations for:
 
 - Jenkins dashboard after login
 - Nodes page with the private agent online
@@ -122,5 +122,5 @@ The final submission for Assignment 4 should include screenshots and explanation
 ## Submission Notes
 
 - Do not commit secrets, state files, `.terraform/` directories, private keys, or environment files.
-- Keep the Assignment 4 report separate from Assignment 3 because the deliverables and screenshots are different.
+- Keep the Cloud Delivery Platform report separate from the infrastructure foundation report because the deliverables and screenshots are different.
 - The final report should include a contribution table for the team members and their work split.
